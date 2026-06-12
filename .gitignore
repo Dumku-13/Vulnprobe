@@ -1,0 +1,14 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Runtime state / credentials — never commit these
+vulnprobe.db
+users.json
+
+# Generated reports & scratch files
+*.pdf
+fix_canvas.py
