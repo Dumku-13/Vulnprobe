@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VulnProbe — Scheduler</title>
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --bg: #0d1117; --panel: #161b22; --border: rgba(0, 255, 136, 0.15);
+      --accent: #00ff88; --text: #c9d1d9; --muted: #8b949e; --dim: #6e7681;
+    }
+    body {
+      min-height: 100vh; background: var(--bg);
+      font-family: 'Courier New', 'Fira Mono', monospace; color: var(--text);
+      padding-bottom: 60px;
+    }
+    body::before {
+      content: ''; position: fixed; inset: 0;
+      background-image:
+        linear-gradient(rgba(0, 255, 136, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 255, 136, 0.03) 1px, transparent 1px);
+      background-size: 40px 40px; z-index: 0; pointer-events: none;
+    }
+    .wrap { position: relative; z-index: 1; max-width: 1100px; margin: 0 auto; padding: 0 24px; }
+    header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 22px 0 18px; border-bottom: 1px solid var(--border); margin-bottom: 28px;
+    }
+    .brand { display: flex; align-items: center; gap: 12px; }
+    .brand .icon { font-size: 28px; }
+    .brand h1 { font-size: 20px; letter-spacing: 2px; color: var(--accent); text-shadow: 0 0 20px rgba(0, 255, 136, 0.3); }
+    .brand p { font-size: 10px; color: var(--dim); letter-spacing: 1px; text-transform: uppercase; }
+    .nav { display: flex; align-items: center; gap: 10px; }
+    .nav a, .nav span.user {
+      font-size: 12px; text-decoration: none; color: var(--muted);
+      padding: 8px 14px; border: 1px solid var(--border); border-radius: 6px; transition: all 0.2s;
+    }
+    .nav a:hover { color: var(--accent); border-color: var(--accent); }
+    .nav .user { color: var(--accent); }
+    .nav .logout:hover { color: #f85149; border-color: #f85149; }
+    .section-title { font-size: 12px; text-transform: uppercase; letter-spacing: 2px; color: var(--muted); margin: 0 0 14px 2px; }
+
+    .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 22px; margin-bottom: 32px; }
+    .form-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+    .field { display: flex; flex-direction: column; gap: 6px; }
+    .field.full { grid-column: 1 / -1; }
+    label { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); }
+    input, select {
+      background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+      color: var(--text); font-family: inherit; font-size: 13px; padding: 10px 12px;
+    }
+    input:focus, select:focus { outline: none; border-color: var(--accent); }
+    .btn-row { margin-top: 18px; }
+    .btn {
+      cursor: pointer; font-family: inherit; font-size: 13px; padding: 10px 20px;
+      border-radius: 6px; border: 1px solid var(--accent); background: rgba(0,255,136,0.08);
+      color: var(--accent); transition: all 0.2s;
+    }
+    .btn:hover { background: rgba(0,255,136,0.16); box-shadow: 0 0 14px rgba(0,255,136,0.15); }
+
+    .table-wrap { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    thead th {
+      text-align: left; padding: 12px 16px; font-size: 11px; text-transform: uppercase;
+      letter-spacing: 1px; color: var(--muted); border-bottom: 1px solid var(--border);
+    }
+    tbody td { padding: 12px 16px; border-bottom: 1px solid rgba(255,255,255,0.04); vertical-align: middle; }
+    tbody tr:last-child td { border-bottom: none; }
+    tbody tr:hover { background: rgba(0, 255, 136, 0.03); }
+    .scanner-tag { color: var(--accent); }
+    .target-cell { word-break: break-all; max-width: 240px; }
+    .time-cell { color: var(--dim); font-size: 11px; }
+    .status { font-size: 10px; font-weight: 700; text-transform: uppercase; padding: 3px 9px; border-radius: 4px; border: 1px solid currentColor; }
+    .status-active { color: var(--accent); }
+    .status-paused { color: #d29922; }
+    .status-done   { color: var(--dim); }
+    .act { display: inline-flex; gap: 6px; }
+    .act form { display: inline; margin: 0; }
+    .act button {
+      cursor: pointer; font-family: inherit; font-size: 11px; padding: 5px 10px;
+      border-radius: 5px; border: 1px solid var(--border); background: transparent; color: var(--muted); transition: all 0.2s;
+    }
+    .act button:hover { color: var(--accent); border-color: var(--accent); }
+    .act button.del:hover { color: #f85149; border-color: #f85149; }
+    .empty { text-align: center; padding: 50px 20px; color: var(--dim); }
+    .freq-badge { color: var(--muted); font-size: 11px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="brand">
+        <span class="icon">🛡️</span>
+        <div><h1>VULNPROBE</h1><p>Scan Scheduler</p></div>
+      </div>
+      <nav class="nav">
+        <span id="notif-bell"></span>
+        <span class="user">👤 {{ username }}{% if is_admin %} (admin){% endif %}</span>
+        <a href="{{ url_for('dashboard') }}">📊 Dashboard</a>
+        <a href="{{ url_for('index') }}">🔍 Scanner</a>
+        <a href="{{ url_for('reports') }}">📁 Reports</a>
+        <a href="{{ url_for('settings_page') }}">⚙️ Settings</a>
+        <a class="logout" href="{{ url_for('logout') }}">⏻ Logout</a>
+      </nav>
+    </header>
+
+    <h2 class="section-title">Schedule a New Scan</h2>
+    <div class="panel">
+      <form method="POST" action="{{ url_for('scheduler_create') }}">
+        <div class="form-grid">
+          <div class="field full">
+            <label for="target">Target URL</label>
+            <input type="text" id="target" name="target" placeholder="http://127.0.0.1:5000/page?id=1" required />
+          </div>
+          <div class="field">
+            <label for="scanner">Scanner</label>
+            <select id="scanner" name="scanner">
+              {% for key, label in scanner_labels.items() %}
+              <option value="{{ key }}">{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="field">
+            <label for="frequency">Frequency</label>
+            <select id="frequency" name="frequency">
+              <option value="once">Once</option>
+              <option value="daily">Daily</option>
+              <option value="weekly">Weekly</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="first_run">First Run (local time)</label>
+            <input type="datetime-local" id="first_run" name="first_run" />
+          </div>
+          <div class="field">
+            <label for="param">Param to fuzz (optional)</label>
+            <input type="text" id="param" name="param" placeholder="id" />
+          </div>
+          <div class="field full">
+            <label for="cookies">Session cookies (optional)</label>
+            <input type="text" id="cookies" name="cookies" placeholder="session=abc123; token=xyz" />
+          </div>
+        </div>
+        <div class="btn-row">
+          <button class="btn" type="submit">＋ Schedule Scan</button>
+        </div>
+      </form>
+    </div>
+
+    <h2 class="section-title">{% if is_admin %}All Scheduled Scans{% else %}Your Scheduled Scans{% endif %}</h2>
+    <div class="table-wrap">
+      {% if scheduled %}
+      <table>
+        <thead>
+          <tr>
+            {% if is_admin %}<th>User</th>{% endif %}
+            <th>Scanner</th>
+            <th>Target</th>
+            <th>Frequency</th>
+            <th>Next Run (UTC)</th>
+            <th>Last Run (UTC)</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for s in scheduled %}
+          <tr>
+            {% if is_admin %}<td>{{ s.username }}</td>{% endif %}
+            <td class="scanner-tag">{{ scanner_labels.get(s.scanner, s.scanner) }}</td>
+            <td class="target-cell">{{ s.target }}</td>
+            <td class="freq-badge">{{ s.frequency }}</td>
+            <td class="time-cell">{{ s.next_run.replace('T', ' ') if s.next_run else '—' }}</td>
+            <td class="time-cell">{{ s.last_run.replace('T', ' ') if s.last_run else '—' }}</td>
+            <td><span class="status status-{{ s.status }}">{{ s.status }}</span></td>
+            <td>
+              <span class="act">
+                {% if s.status == 'active' %}
+                <form method="POST" action="{{ url_for('scheduler_action', sched_id=s.id, action='pause') }}">
+                  <button type="submit">⏸ Pause</button>
+                </form>
+                {% else %}
+                <form method="POST" action="{{ url_for('scheduler_action', sched_id=s.id, action='resume') }}">
+                  <button type="submit">▶ Resume</button>
+                </form>
+                {% endif %}
+                <form method="POST" action="{{ url_for('scheduler_action', sched_id=s.id, action='delete') }}"
+                      onsubmit="return confirm('Delete this scheduled scan?');">
+                  <button type="submit" class="del">🗑 Delete</button>
+                </form>
+              </span>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <div class="empty">No scheduled scans yet. Create one above.</div>
+      {% endif %}
+    </div>
+  </div>
+  <script src="{{ url_for('static', filename='notifications.js') }}"></script>
+</body>
+</html>

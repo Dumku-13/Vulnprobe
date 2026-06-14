@@ -544,8 +544,11 @@
                 <span class="btn-label">📄 Download Full Report</span>
                 <div class="spinner"></div>
             </button>
+            <span id="notif-bell"></span>
             <a href="/dashboard" style="font-size:12px;color:var(--text-muted);text-decoration:none;padding:8px 14px;border:1px solid var(--border);border-radius:var(--radius-sm);">📊 Dashboard</a>
             <a href="/reports" style="font-size:12px;color:var(--text-muted);text-decoration:none;padding:8px 14px;border:1px solid var(--border);border-radius:var(--radius-sm);">📁 Reports</a>
+            <a href="/scheduler" style="font-size:12px;color:var(--text-muted);text-decoration:none;padding:8px 14px;border:1px solid var(--border);border-radius:var(--radius-sm);">⏰ Scheduler</a>
+            <a href="/settings" style="font-size:12px;color:var(--text-muted);text-decoration:none;padding:8px 14px;border:1px solid var(--border);border-radius:var(--radius-sm);">⚙️ Settings</a>
             <a href="/logout" style="font-size:12px;color:var(--text-muted);text-decoration:none;padding:8px 14px;border:1px solid var(--border);border-radius:var(--radius-sm);">Logout</a>
         </div>
     </header>
@@ -1399,5 +1402,6 @@ document.getElementById('btn-global-report').addEventListener('click', async () 
     }
 });
 </script>
+<script src="{{ url_for('static', filename='notifications.js') }}"></script>
 </body>
 </html>

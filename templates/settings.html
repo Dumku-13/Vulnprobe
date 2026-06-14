@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VulnProbe — Settings</title>
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --bg: #0d1117; --panel: #161b22; --border: rgba(0, 255, 136, 0.15);
+      --accent: #00ff88; --text: #c9d1d9; --muted: #8b949e; --dim: #6e7681;
+    }
+    body {
+      min-height: 100vh; background: var(--bg);
+      font-family: 'Courier New', 'Fira Mono', monospace; color: var(--text); padding-bottom: 60px;
+    }
+    body::before {
+      content: ''; position: fixed; inset: 0;
+      background-image:
+        linear-gradient(rgba(0, 255, 136, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 255, 136, 0.03) 1px, transparent 1px);
+      background-size: 40px 40px; z-index: 0; pointer-events: none;
+    }
+    .wrap { position: relative; z-index: 1; max-width: 880px; margin: 0 auto; padding: 0 24px; }
+    header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 22px 0 18px; border-bottom: 1px solid var(--border); margin-bottom: 28px;
+    }
+    .brand { display: flex; align-items: center; gap: 12px; }
+    .brand .icon { font-size: 28px; }
+    .brand h1 { font-size: 20px; letter-spacing: 2px; color: var(--accent); text-shadow: 0 0 20px rgba(0, 255, 136, 0.3); }
+    .brand p { font-size: 10px; color: var(--dim); letter-spacing: 1px; text-transform: uppercase; }
+    .nav { display: flex; align-items: center; gap: 10px; }
+    .nav a, .nav span.user {
+      font-size: 12px; text-decoration: none; color: var(--muted);
+      padding: 8px 14px; border: 1px solid var(--border); border-radius: 6px; transition: all 0.2s;
+    }
+    .nav a:hover { color: var(--accent); border-color: var(--accent); }
+    .nav .user { color: var(--accent); }
+    .nav .logout:hover { color: #f85149; border-color: #f85149; }
+    .section-title { font-size: 12px; text-transform: uppercase; letter-spacing: 2px; color: var(--muted); margin: 0 0 14px 2px; }
+
+    .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 24px; margin-bottom: 28px; }
+    .panel p.lead { color: var(--muted); font-size: 13px; line-height: 1.6; margin-bottom: 18px; }
+
+    .key-box {
+      display: flex; align-items: center; gap: 10px; background: var(--bg);
+      border: 1px solid var(--border); border-radius: 6px; padding: 12px 14px; margin-bottom: 14px;
+    }
+    .key-box code { flex: 1; color: var(--accent); font-size: 13px; word-break: break-all; }
+    .meta { font-size: 11px; color: var(--dim); margin-bottom: 18px; }
+    .meta span { margin-right: 18px; }
+
+    .btn {
+      cursor: pointer; font-family: inherit; font-size: 12px; padding: 9px 16px;
+      border-radius: 6px; border: 1px solid var(--border); background: transparent; color: var(--text); transition: all 0.2s;
+    }
+    .btn-accent { color: var(--accent); border-color: var(--accent); background: rgba(0,255,136,0.08); }
+    .btn-accent:hover { background: rgba(0,255,136,0.16); }
+    .btn-copy:hover { color: var(--accent); border-color: var(--accent); }
+    .btn-del { color: #f85149; border-color: rgba(248,81,73,0.3); }
+    .btn-del:hover { border-color: #f85149; background: rgba(248,81,73,0.08); }
+    .btn-row { display: flex; gap: 10px; flex-wrap: wrap; }
+    form { display: inline; }
+
+    .usage { margin-top: 8px; }
+    .usage pre {
+      background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+      padding: 14px; font-size: 12px; color: var(--text); overflow-x: auto; line-height: 1.6;
+    }
+    .usage .k { color: var(--accent); }
+    .none-msg { color: var(--dim); font-size: 13px; margin-bottom: 16px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="brand">
+        <span class="icon">🛡️</span>
+        <div><h1>VULNPROBE</h1><p>Settings</p></div>
+      </div>
+      <nav class="nav">
+        <span id="notif-bell"></span>
+        <span class="user">👤 {{ username }}</span>
+        <a href="{{ url_for('dashboard') }}">📊 Dashboard</a>
+        <a href="{{ url_for('scheduler_page') }}">⏰ Scheduler</a>
+        <a href="{{ url_for('reports') }}">📁 Reports</a>
+        <a class="logout" href="{{ url_for('logout') }}">⏻ Logout</a>
+      </nav>
+    </header>
+
+    <h2 class="section-title">API Key</h2>
+    <div class="panel">
+      <p class="lead">
+        Use this key to drive every <code>/api/*</code> endpoint from scripts or
+        curl — pass it in an <code>X-API-Key</code> header instead of logging in.
+        Treat it like a password.
+      </p>
+
+      {% if api_key %}
+      <div class="key-box">
+        <code id="api-key">{{ api_key }}</code>
+        <button class="btn btn-copy" id="btn-copy" type="button">Copy</button>
+      </div>
+      <div class="meta">
+        <span>Created: {{ key_created.replace('T', ' ')[:19] if key_created else '—' }} UTC</span>
+        <span>Last used: {{ key_last_used.replace('T', ' ')[:19] if key_last_used else 'never' }}{{ ' UTC' if key_last_used }}</span>
+      </div>
+      <div class="btn-row">
+        <form method="POST" action="{{ url_for('settings_generate_key') }}"
+              onsubmit="return confirm('Generate a new key? The current key stops working immediately.');">
+          <button class="btn btn-accent" type="submit">↻ Regenerate</button>
+        </form>
+        <form method="POST" action="{{ url_for('settings_revoke_key') }}"
+              onsubmit="return confirm('Revoke this key? API access stops until you generate a new one.');">
+          <button class="btn btn-del" type="submit">🗑 Revoke</button>
+        </form>
+      </div>
+
+      <div class="usage">
+        <p class="lead" style="margin-top:20px;margin-bottom:8px;">Example</p>
+        <pre><span class="k">curl</span> -H <span class="k">"X-API-Key: {{ api_key }}"</span> \
+     {{ request.url_root }}api/export/csv -o scans.csv</pre>
+      </div>
+      {% else %}
+      <p class="none-msg">No API key yet. Generate one to enable scripted access.</p>
+      <form method="POST" action="{{ url_for('settings_generate_key') }}">
+        <button class="btn btn-accent" type="submit">＋ Generate API Key</button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+
+  <script src="{{ url_for('static', filename='notifications.js') }}"></script>
+  <script>
+    var copyBtn = document.getElementById('btn-copy');
+    if (copyBtn) {
+      copyBtn.addEventListener('click', async function () {
+        var key = document.getElementById('api-key').textContent.trim();
+        try {
+          await navigator.clipboard.writeText(key);
+          copyBtn.textContent = '✓ Copied';
+        } catch (e) {
+          copyBtn.textContent = '✗ Failed';
+        }
+        setTimeout(function () { copyBtn.textContent = 'Copy'; }, 2000);
+      });
+    }
+  </script>
+</body>
+</html>

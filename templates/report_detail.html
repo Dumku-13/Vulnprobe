@@ -133,6 +133,50 @@
     .ai-btn.copied { background: var(--accent); color: #0d1117; border-color: var(--accent); }
 
     .empty { text-align: center; padding: 50px 20px; color: var(--dim); }
+
+    /* Severity strip (live counts) */
+    .sev-strip {
+      display: flex; gap: 12px; margin-bottom: 22px; flex-wrap: wrap;
+    }
+    .sev-stat {
+      background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+      padding: 12px 18px; text-align: center; min-width: 84px;
+    }
+    .sev-stat .n { font-size: 22px; font-weight: 700; display: block; }
+    .sev-stat .s { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-top: 3px; }
+    .sev-stat .n.sev-Critical { color: #f85149; }
+    .sev-stat .n.sev-High     { color: #ff7b72; }
+    .sev-stat .n.sev-Medium   { color: #d29922; }
+    .sev-stat .n.sev-Low      { color: #58a6ff; }
+    .sev-stat .n.sev-Info     { color: #8b949e; }
+    .sev-stat .n.total        { color: var(--accent); }
+
+    /* False-positive state */
+    .finding.is-fp { opacity: 0.5; filter: grayscale(0.8); border-left-color: var(--dim) !important; }
+    .fp-label { color: #d29922; display: none; }
+    .finding.is-fp .fp-label { display: inline-block; }
+
+    /* Notes */
+    .notes-row { margin-top: 4px; }
+    .note-input {
+      width: 100%; min-height: 64px; resize: vertical; font-family: inherit; font-size: 12px;
+      background: var(--bg); border: 1px solid var(--border); border-radius: 5px;
+      color: var(--text); padding: 10px 12px; line-height: 1.5;
+    }
+    .note-input:focus { outline: none; border-color: var(--accent); }
+    .note-saved {
+      display: none; font-size: 11px; color: var(--accent); margin-top: 6px;
+    }
+    .note-saved.show { display: inline-block; }
+
+    /* Card action buttons */
+    .card-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+    .fp-btn {
+      font-size: 11px; font-family: inherit; cursor: pointer;
+      padding: 8px 14px; border-radius: 6px; border: 1px solid rgba(210,153,34,0.4);
+      background: rgba(210,153,34,0.07); color: #d29922; transition: all 0.2s;
+    }
+    .fp-btn:hover { border-color: #d29922; }
   </style>
 </head>
 <body>
@@ -147,6 +191,7 @@
         </div>
       </div>
       <nav class="nav">
+        <span id="notif-bell"></span>
         <span class="user">👤 {{ username }}</span>
         <a href="{{ url_for('reports') }}">📁 Reports</a>
         <a href="{{ url_for('dashboard') }}">📊 Dashboard</a>
@@ -179,18 +224,29 @@
       </div>
     </div>
 
+    {% if scan.findings %}
+    <div class="sev-strip" id="sev-strip">
+      <div class="sev-stat"><span class="n total" data-total>{{ scan.findings_count }}</span><span class="s">Active</span></div>
+      {% for sev in ['Critical', 'High', 'Medium', 'Low', 'Info'] %}
+      <div class="sev-stat"><span class="n sev-{{ sev }}" data-sev="{{ sev }}">{{ scan.severity_summary.get(sev, 0) }}</span><span class="s">{{ sev }}</span></div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
     <h2 class="section-title">Findings</h2>
 
     {% if scan.findings %}
       {% for f in scan.findings %}
       {% set sev = (f.severity or 'Info')|title %}
       {% set vuln = f.vuln_type or f.type or 'Unknown' %}
-      <div class="finding sev-{{ sev }}">
+      {% set idx = loop.index0 %}
+      <div class="finding sev-{{ sev }}{{ ' is-fp' if f.false_positive }}" data-index="{{ idx }}" data-severity="{{ sev }}">
         <div class="finding-top">
           <span class="badge sev-{{ sev }}">{{ sev }}</span>
           <span class="badge badge-type">{{ vuln }}</span>
           {% if f.subtype %}<span class="badge badge-type">{{ f.subtype }}</span>{% endif %}
           <span class="vuln-name">{{ vuln }}</span>
+          <span class="badge fp-label">False Positive</span>
         </div>
 
         {% if f.parameter %}
@@ -221,12 +277,24 @@
           <div class="v">{{ f.remediation }}</div>
         </div>
 
-        <button class="ai-btn"
-                data-vuln="{{ vuln }}"
-                data-payload="{{ f.payload if f.payload else 'N/A' }}"
-                data-evidence="{{ f.evidence if f.evidence else 'N/A' }}">
-          🤖 Copy AI Prompt
-        </button>
+        <div class="row notes-row">
+          <div class="k">Analyst Notes</div>
+          <textarea class="note-input" data-index="{{ idx }}"
+                    placeholder="Add a note… (saved automatically when you click away)">{{ f.note or '' }}</textarea>
+          <span class="note-saved">✓ Saved</span>
+        </div>
+
+        <div class="card-actions">
+          <button class="ai-btn"
+                  data-vuln="{{ vuln }}"
+                  data-payload="{{ f.payload if f.payload else 'N/A' }}"
+                  data-evidence="{{ f.evidence if f.evidence else 'N/A' }}">
+            🤖 Copy AI Prompt
+          </button>
+          <button class="fp-btn" data-index="{{ idx }}">
+            {{ '↩ Unmark False Positive' if f.false_positive else '⚑ Mark as False Positive' }}
+          </button>
+        </div>
       </div>
       {% endfor %}
     {% else %}
@@ -301,6 +369,68 @@
         }
       });
     }
+
+    /* ── Severity strip live updates ─────────────────────────────── */
+    const SCAN_ID = {{ scan.id }};
+    const strip = document.getElementById('sev-strip');
+
+    function applySummary(summary, total) {
+      if (!strip) return;
+      ['Critical', 'High', 'Medium', 'Low', 'Info'].forEach(function (sev) {
+        const el = strip.querySelector('[data-sev="' + sev + '"]');
+        if (el && summary && sev in summary) el.textContent = summary[sev];
+      });
+      const totalEl = strip.querySelector('[data-total]');
+      if (totalEl && typeof total === 'number') totalEl.textContent = total;
+    }
+
+    /* ── False-positive toggle ───────────────────────────────────── */
+    document.querySelectorAll('.fp-btn').forEach(function (btn) {
+      btn.addEventListener('click', async function () {
+        const idx = btn.dataset.index;
+        const card = btn.closest('.finding');
+        btn.disabled = true;
+        try {
+          const res = await fetch('/api/report/' + SCAN_ID + '/finding/' + idx + '/false-positive', {
+            method: 'PATCH', credentials: 'include'
+          });
+          if (!res.ok) throw new Error('Request failed');
+          const data = await res.json();
+          card.classList.toggle('is-fp', data.false_positive);
+          btn.textContent = data.false_positive ? '↩ Unmark False Positive' : '⚑ Mark as False Positive';
+          applySummary(data.severity_summary, data.findings_count);
+        } catch (e) {
+          alert('Error: ' + e.message);
+        } finally {
+          btn.disabled = false;
+        }
+      });
+    });
+
+    /* ── Analyst notes: auto-save on blur ────────────────────────── */
+    document.querySelectorAll('.note-input').forEach(function (ta) {
+      let lastSaved = ta.value;
+      ta.addEventListener('blur', async function () {
+        if (ta.value === lastSaved) return;
+        const idx = ta.dataset.index;
+        const savedMsg = ta.parentElement.querySelector('.note-saved');
+        try {
+          const res = await fetch('/api/report/' + SCAN_ID + '/finding/' + idx + '/note', {
+            method: 'PATCH',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ note: ta.value })
+          });
+          if (!res.ok) throw new Error('save failed');
+          lastSaved = ta.value;
+          if (savedMsg) {
+            savedMsg.classList.add('show');
+            setTimeout(function () { savedMsg.classList.remove('show'); }, 2000);
+          }
+        } catch (e) { /* keep the text; user can retry on next blur */ }
+      });
+    });
   </script>
+  <script src="{{ url_for('static', filename='notifications.js') }}"></script>
 </body>
 </html>

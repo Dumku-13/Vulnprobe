@@ -105,6 +105,14 @@
 
     .empty { text-align: center; padding: 50px 20px; color: var(--dim); }
     .empty a { color: var(--accent); text-decoration: none; }
+
+    .reports-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+    .export-btn {
+      font-size: 12px; text-decoration: none; color: var(--accent);
+      padding: 8px 14px; border: 1px solid var(--accent); border-radius: 6px;
+      background: rgba(0,255,136,0.08); transition: all 0.2s;
+    }
+    .export-btn:hover { background: rgba(0,255,136,0.16); box-shadow: 0 0 14px rgba(0,255,136,0.15); }
   </style>
 </head>
 <body>
@@ -119,14 +127,20 @@
         </div>
       </div>
       <nav class="nav">
+        <span id="notif-bell"></span>
         <span class="user">👤 {{ username }}</span>
         <a href="{{ url_for('dashboard') }}">📊 Dashboard</a>
         <a href="{{ url_for('index') }}">🔍 Scanner</a>
+        <a href="{{ url_for('scheduler_page') }}">⏰ Scheduler</a>
+        <a href="{{ url_for('settings_page') }}">⚙️ Settings</a>
         <a class="logout" href="{{ url_for('logout') }}">⏻ Logout</a>
       </nav>
     </header>
 
-    <h2 class="section-title">All Reports</h2>
+    <div class="reports-head">
+      <h2 class="section-title" style="margin:0;">All Reports</h2>
+      <a class="export-btn" href="{{ url_for('api_export_csv') }}">⬇ Export CSV</a>
+    </div>
     <div class="table-wrap">
       {% if scans %}
       <table>
@@ -174,5 +188,6 @@
     </div>
 
   </div>
+  <script src="{{ url_for('static', filename='notifications.js') }}"></script>
 </body>
 </html>

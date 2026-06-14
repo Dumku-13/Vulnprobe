@@ -291,6 +291,9 @@ def generate_report(target_url: str, findings: list[dict], output_path: str) -> 
         bottomMargin=60
     )
     
+    # Exclude analyst-confirmed false positives from the report entirely.
+    findings = [f for f in (findings or []) if not f.get("false_positive")]
+
     styles = getSampleStyleSheet()
     normal_style = styles['Normal']
     normal_style.fontSize = 10
@@ -523,7 +526,7 @@ def generate_report(target_url: str, findings: list[dict], output_path: str) -> 
         info_rows.append(make_info_row("i", "#3b82f6", "What it means", expl))
         info_rows.append(make_info_row("!", "#ef4444", "Business Impact", imp))
         info_rows.append(make_info_row("✓", "#10b981", "Remediation", fix))
-        
+
         # Combine all into a single outer card table
         card_content = [
             [header_t],
@@ -534,6 +537,13 @@ def generate_report(target_url: str, findings: list[dict], output_path: str) -> 
             [info_rows[1]],
             [info_rows[2]],
         ]
+
+        # Analyst note (only when present) — dedicated section per finding.
+        note_text = str(f.get("note") or "").strip()
+        if note_text:
+            card_content.append(
+                [make_info_row("✎", "#6366f1", "Analyst Notes", html.escape(note_text))]
+            )
         
         card_table = Table(card_content, colWidths=[520])
         card_table.setStyle(TableStyle([

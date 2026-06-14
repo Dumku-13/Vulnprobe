@@ -122,6 +122,12 @@
 
     .empty { text-align: center; padding: 50px 20px; color: var(--dim); }
     .empty a { color: var(--accent); text-decoration: none; }
+
+    /* Trend chart */
+    .chart-wrap {
+      background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+      padding: 18px 20px; margin-bottom: 36px;
+    }
   </style>
 </head>
 <body>
@@ -136,10 +142,13 @@
         </div>
       </div>
       <nav class="nav">
+        <span id="notif-bell"></span>
         <span class="user">👤 {{ username }}</span>
         <a href="{{ url_for('index') }}">🔍 Scanner</a>
         <a href="{{ url_for('reports') }}">📁 Reports</a>
-        <a href="{{ url_for('react_dashboard') }}">⚛️ React Dashboard</a>
+        <a href="{{ url_for('scheduler_page') }}">⏰ Scheduler</a>
+        <a href="{{ url_for('settings_page') }}">⚙️ Settings</a>
+        <a href="{{ url_for('react_dashboard') }}">⚛️ React</a>
         <a class="logout" href="{{ url_for('logout') }}">⏻ Logout</a>
       </nav>
     </header>
@@ -172,6 +181,11 @@
         <div class="s">{{ sev }}</div>
       </div>
       {% endfor %}
+    </div>
+
+    <h2 class="section-title">Findings Trend — Last 30 Days</h2>
+    <div class="chart-wrap">
+      <canvas id="trendChart" height="110"></canvas>
     </div>
 
     <h2 class="section-title">Recent Scan History</h2>
@@ -217,5 +231,67 @@
     </div>
 
   </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="{{ url_for('static', filename='notifications.js') }}"></script>
+  <script>
+    (function () {
+      var SEV = [
+        ["Critical", "#f85149"],
+        ["High",     "#ff7b72"],
+        ["Medium",   "#d29922"],
+        ["Low",      "#58a6ff"],
+        ["Info",     "#8b949e"]
+      ];
+
+      fetch("/api/trend", { credentials: "include" })
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+          if (typeof Chart === "undefined") return;
+          var days = data.days || [];
+          var labels = days.map(function (d) { return d.date.slice(5); }); // MM-DD
+
+          var datasets = SEV.map(function (pair) {
+            var name = pair[0], color = pair[1];
+            return {
+              label: name,
+              data: days.map(function (d) { return d[name] || 0; }),
+              borderColor: color,
+              backgroundColor: color,
+              tension: 0.3,
+              pointRadius: 2,
+              borderWidth: 2,
+              fill: false
+            };
+          });
+
+          var ctx = document.getElementById("trendChart").getContext("2d");
+          new Chart(ctx, {
+            type: "line",
+            data: { labels: labels, datasets: datasets },
+            options: {
+              responsive: true,
+              interaction: { mode: "index", intersect: false },
+              plugins: {
+                legend: { labels: { color: "#c9d1d9", font: { family: "monospace", size: 11 } } },
+                tooltip: { titleColor: "#fff", bodyColor: "#c9d1d9" }
+              },
+              scales: {
+                x: {
+                  ticks: { color: "#8b949e", font: { family: "monospace", size: 10 } },
+                  grid: { color: "rgba(255,255,255,0.04)" }
+                },
+                y: {
+                  beginAtZero: true,
+                  ticks: { color: "#8b949e", precision: 0, font: { family: "monospace", size: 10 } },
+                  grid: { color: "rgba(255,255,255,0.04)" }
+                }
+              }
+            }
+          });
+        })
+        .catch(function () { /* leave canvas blank on error */ });
+    })();
+  </script>
 </body>
 </html>

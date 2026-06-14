@@ -11,4 +11,5 @@ users.json
 
 # Generated reports & scratch files
 *.pdf
+*.log
 fix_canvas.py
