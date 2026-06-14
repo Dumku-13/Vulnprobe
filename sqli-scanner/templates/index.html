@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="SQL Injection Scanner — Detect error-based, boolean-based, and time-based SQLi vulnerabilities." />
+    <title>SQLi Scanner</title>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <style>
+        /* ── Reset ────────────────────────────────────────────────── */
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --bg:         #09090b;
+            --bg-card:    #131316;
+            --bg-input:   #0c0c0f;
+            --bg-row:     #16161a;
+            --border:     #222228;
+            --border-hi:  #333;
+            --text:       #d4d4d8;
+            --text-dim:   #71717a;
+            --text-muted: #52525b;
+            --green:      #22c55e;
+            --green-bg:   rgba(34,197,94,.08);
+            --green-bdr:  rgba(34,197,94,.35);
+            --red:        #ef4444;
+            --red-bg:     rgba(239,68,68,.08);
+            --red-bdr:    rgba(239,68,68,.4);
+            --accent:     #6366f1;
+            --accent-bg:  rgba(99,102,241,.12);
+            --yellow:     #eab308;
+        }
+
+        body {
+            font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            line-height: 1.6;
+        }
+
+        /* ── Layout ───────────────────────────────────────────────── */
+        .shell {
+            max-width: 100%;
+            padding: 32px 48px 80px;
+        }
+
+        /* ── Header ───────────────────────────────────────────────── */
+        .header {
+            margin-bottom: 32px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid var(--border);
+        }
+        .header h1 {
+            font-size: 22px;
+            font-weight: 700;
+            color: #f4f4f5;
+            letter-spacing: -0.5px;
+        }
+        .header h1 span { color: var(--accent); }
+        .header p {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+
+        /* ── Form ─────────────────────────────────────────────────── */
+        .form-row {
+            display: flex;
+            gap: 12px;
+            align-items: flex-end;
+            flex-wrap: wrap;
+        }
+        .field {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            flex: 1;
+            min-width: 200px;
+        }
+        .field label {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+        }
+        .field input {
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 10px 12px;
+            font-family: inherit;
+            font-size: 13px;
+            color: var(--text);
+            outline: none;
+            transition: border-color .15s, box-shadow .15s;
+        }
+        .field input::placeholder { color: var(--text-muted); }
+        .field input:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 2px var(--accent-bg);
+        }
+
+        /* ── Button ───────────────────────────────────────────────── */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 22px;
+            background: var(--accent);
+            color: #fff;
+            border: none;
+            border-radius: 6px;
+            font-family: inherit;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: opacity .15s, transform .1s;
+            white-space: nowrap;
+        }
+        .btn:hover { opacity: .85; }
+        .btn:active { transform: scale(.97); }
+        .btn:disabled { opacity: .4; cursor: not-allowed; transform: none; }
+
+        .spinner {
+            width: 14px; height: 14px;
+            border: 2px solid rgba(255,255,255,.25);
+            border-top-color: #fff;
+            border-radius: 50%;
+            animation: spin .5s linear infinite;
+            display: none;
+        }
+        .btn.loading .spinner { display: block; }
+        .btn.loading .btn-text { display: none; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ── Loading bar ──────────────────────────────────────────── */
+        .loading-bar {
+            display: none;
+            margin-top: 20px;
+        }
+        .loading-bar.active { display: block; }
+        .loading-track {
+            height: 3px;
+            background: var(--border);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+        .loading-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, var(--accent), #818cf8);
+            border-radius: 2px;
+            transition: width .25s ease;
+        }
+        .loading-label {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-top: 6px;
+        }
+
+        /* ── Error box ────────────────────────────────────────────── */
+        .error-box {
+            display: none;
+            margin-top: 20px;
+            padding: 12px 16px;
+            background: var(--red-bg);
+            border: 1px solid var(--red-bdr);
+            border-radius: 6px;
+            color: var(--red);
+            font-size: 12px;
+            font-weight: 500;
+        }
+        .error-box.active { display: block; }
+
+        /* ── Results wrapper ──────────────────────────────────────── */
+        .results {
+            display: none;
+            margin-top: 32px;
+            animation: fadeUp .35s ease;
+        }
+        .results.active { display: block; }
+
+        @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(10px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        /* ── Summary bar ──────────────────────────────────────────── */
+        .summary {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 24px;
+            padding: 16px 20px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            margin-bottom: 20px;
+            align-items: center;
+        }
+        .summary-item {
+            display: flex;
+            align-items: baseline;
+            gap: 6px;
+        }
+        .summary-label {
+            font-size: 11px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .summary-value {
+            font-size: 15px;
+            font-weight: 700;
+            color: var(--text);
+        }
+        .summary-value.vuln-count { color: var(--red); }
+        .summary-value.safe-count { color: var(--green); }
+
+        .summary-sep {
+            width: 1px;
+            height: 20px;
+            background: var(--border);
+        }
+
+        /* ── Result rows ──────────────────────────────────────────── */
+        .row {
+            display: grid;
+            grid-template-columns: 1fr auto auto auto auto;
+            gap: 16px;
+            align-items: center;
+            padding: 12px 16px;
+            background: var(--bg-row);
+            border: 1px solid var(--border);
+            border-left: 3px solid var(--green-bdr);
+            border-radius: 6px;
+            margin-bottom: 6px;
+            opacity: 0;
+            animation: rowIn .3s ease forwards;
+        }
+        .row.vuln {
+            border-left-color: var(--red-bdr);
+            background: var(--red-bg);
+        }
+        .row.clean {
+            border-left-color: var(--green-bdr);
+        }
+
+        @keyframes rowIn {
+            from { opacity: 0; transform: translateX(-6px); }
+            to   { opacity: 1; transform: translateX(0); }
+        }
+
+        .row-payload {
+            font-size: 12px;
+            color: var(--text);
+            word-break: break-all;
+            min-width: 0;
+        }
+        .row-payload .error-match {
+            display: block;
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-top: 3px;
+            font-style: italic;
+        }
+
+        .row-meta {
+            font-size: 11px;
+            color: var(--text-dim);
+            white-space: nowrap;
+            text-align: right;
+        }
+
+        /* ── Badges ───────────────────────────────────────────────── */
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 3px 9px;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 0.4px;
+            text-transform: uppercase;
+            white-space: nowrap;
+        }
+        .badge-vuln {
+            background: var(--red-bg);
+            color: var(--red);
+            border: 1px solid var(--red-bdr);
+        }
+        .badge-clean {
+            background: var(--green-bg);
+            color: var(--green);
+            border: 1px solid var(--green-bdr);
+        }
+        .badge-type {
+            background: rgba(234,179,8,.08);
+            color: var(--yellow);
+            border: 1px solid rgba(234,179,8,.2);
+            margin-left: 4px;
+        }
+
+        /* ── Responsive ───────────────────────────────────────────── */
+        @media (max-width: 700px) {
+            .shell { padding: 20px 16px 60px; }
+            .row {
+                grid-template-columns: 1fr;
+                gap: 6px;
+            }
+            .row-meta { text-align: left; }
+            .summary { gap: 12px; }
+        }
+    </style>
+</head>
+<body>
+<div class="shell">
+
+    <!-- Header -->
+    <div class="header">
+        <h1><span>&gt;</span> SQLi Scanner</h1>
+        <p>error-based · boolean-based · time-based detection</p>
+    </div>
+
+    <!-- Form -->
+    <form id="scan-form" autocomplete="off">
+        <div class="form-row">
+            <div class="field" style="flex:2">
+                <label for="url-input">Target URL</label>
+                <input type="text" id="url-input" placeholder="https://target.com/page.php" required />
+            </div>
+            <div class="field" style="flex:0.7">
+                <label for="param-input">Parameter</label>
+                <input type="text" id="param-input" placeholder="id" required />
+            </div>
+            <button type="submit" class="btn" id="scan-btn">
+                <span class="btn-text">▶ Start Scan</span>
+                <div class="spinner"></div>
+            </button>
+        </div>
+    </form>
+
+    <!-- Loading bar -->
+    <div class="loading-bar" id="loading-bar">
+        <div class="loading-track">
+            <div class="loading-fill" id="loading-fill"></div>
+        </div>
+        <div class="loading-label" id="loading-label">Sending payloads…</div>
+    </div>
+
+    <!-- Error -->
+    <div class="error-box" id="error-box"></div>
+
+    <!-- Results -->
+    <div class="results" id="results">
+        <div class="summary" id="summary"></div>
+        <div id="rows"></div>
+    </div>
+
+</div>
+
+<script>
+    const form      = document.getElementById('scan-form');
+    const btn       = document.getElementById('scan-btn');
+    const errorBox  = document.getElementById('error-box');
+    const resultsEl = document.getElementById('results');
+    const summaryEl = document.getElementById('summary');
+    const rowsEl    = document.getElementById('rows');
+    const loadBar   = document.getElementById('loading-bar');
+    const loadFill  = document.getElementById('loading-fill');
+    const loadLabel = document.getElementById('loading-label');
+
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const url   = document.getElementById('url-input').value.trim();
+        const param = document.getElementById('param-input').value.trim();
+        if (!url || !param) return;
+
+        // Reset
+        errorBox.classList.remove('active');
+        resultsEl.classList.remove('active');
+        btn.classList.add('loading');
+        btn.disabled = true;
+        loadBar.classList.add('active');
+        loadFill.style.width = '0%';
+        loadLabel.textContent = 'Sending payloads… this may take a minute';
+
+        let pct = 0;
+        const ticker = setInterval(() => {
+            pct += Math.random() * 2.5;
+            if (pct > 90) pct = 90;
+            loadFill.style.width = pct + '%';
+        }, 500);
+
+        try {
+            const res = await fetch('/scan', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ url, param }),
+            });
+
+            clearInterval(ticker);
+            loadFill.style.width = '100%';
+            loadLabel.textContent = 'Done';
+
+            const data = await res.json();
+
+            if (!res.ok || data.error) {
+                showError(data.error || 'Scan failed.');
+                return;
+            }
+
+            render(data);
+        } catch (err) {
+            clearInterval(ticker);
+            showError('Network error — is the server running?');
+        } finally {
+            btn.classList.remove('loading');
+            btn.disabled = false;
+            setTimeout(() => loadBar.classList.remove('active'), 1200);
+        }
+    });
+
+    function showError(msg) {
+        errorBox.textContent = msg;
+        errorBox.classList.add('active');
+    }
+
+    function render(data) {
+        // Summary
+        const vCount = data.total_vulnerabilities;
+        const vClass = vCount > 0 ? 'vuln-count' : 'safe-count';
+        const totalTime = data.results.reduce((s, r) => s + r.time, 0).toFixed(1);
+
+        summaryEl.innerHTML = `
+            <div class="summary-item">
+                <span class="summary-label">Payloads</span>
+                <span class="summary-value">${data.total_payloads}</span>
+            </div>
+            <div class="summary-sep"></div>
+            <div class="summary-item">
+                <span class="summary-label">Vulnerabilities</span>
+                <span class="summary-value ${vClass}">${vCount}</span>
+            </div>
+            <div class="summary-sep"></div>
+            <div class="summary-item">
+                <span class="summary-label">Baseline</span>
+                <span class="summary-value">${data.baseline.status} · ${data.baseline.length}B · ${data.baseline.time}s</span>
+            </div>
+            <div class="summary-sep"></div>
+            <div class="summary-item">
+                <span class="summary-label">Total time</span>
+                <span class="summary-value">${totalTime}s</span>
+            </div>
+        `;
+
+        // Rows
+        rowsEl.innerHTML = '';
+        data.results.forEach((r, i) => {
+            const isVuln = r.vulnerable;
+            const div = document.createElement('div');
+            div.className = 'row ' + (isVuln ? 'vuln' : 'clean');
+            div.style.animationDelay = (i * 30) + 'ms';
+
+            // Payload cell
+            let payloadHtml = esc(r.payload);
+            if (r.errors && r.errors.length) {
+                payloadHtml += `<span class="error-match">↳ matched: ${esc(r.errors.join('; '))}</span>`;
+            }
+
+            // Status badge
+            const badge = isVuln
+                ? `<span class="badge badge-vuln">vulnerable</span>`
+                : `<span class="badge badge-clean">clean</span>`;
+
+            // Type tags
+            let typeTags = '';
+            if (r.types && r.types.length) {
+                typeTags = r.types.map(t => `<span class="badge badge-type">${esc(t)}</span>`).join('');
+            }
+
+            div.innerHTML = `
+                <div class="row-payload">${payloadHtml}</div>
+                <div class="row-meta">${r.status}</div>
+                <div class="row-meta">${r.length}B</div>
+                <div class="row-meta">${r.time}s</div>
+                <div>${badge}${typeTags}</div>
+            `;
+
+            rowsEl.appendChild(div);
+        });
+
+        resultsEl.classList.add('active');
+        resultsEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    function esc(s) {
+        const d = document.createElement('div');
+        d.textContent = s;
+        return d.innerHTML;
+    }
+</script>
+</body>
+</html>

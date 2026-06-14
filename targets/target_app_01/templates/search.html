@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block content %}
+    <h2>Search Donor Records</h2>
+    
+    <form method="GET" action="/search">
+        <label for="donor_id">Donor ID:</label>
+        <!-- Form field with a numeric default value for the IDOR scanner to find -->
+        <input type="number" id="donor_id" name="donor_id" value="1" required>
+        <button type="submit">Search</button>
+    </form>
+
+    {% if searched %}
+        <hr style="border-color: #333; margin: 20px 0;">
+        {% if donor %}
+            <h3>Donor Record Found</h3>
+            <table>
+                <tr>
+                    <th>ID</th>
+                    <td>{{ donor.id }}</td>
+                </tr>
+                <tr>
+                    <th>Name</th>
+                    <td>{{ donor.name }}</td>
+                </tr>
+                <tr>
+                    <th>Email</th>
+                    <td>{{ donor.email }}</td>
+                </tr>
+                <tr>
+                    <th>Amount</th>
+                    <td>${{ "%.2f"|format(donor.amount) }}</td>
+                </tr>
+                <tr>
+                    <th>Date</th>
+                    <td>{{ donor.date }}</td>
+                </tr>
+                <tr>
+                    <th>Message</th>
+                    <td>{{ donor.message }}</td>
+                </tr>
+            </table>
+        {% else %}
+            <p class="error">No donor found with that ID.</p>
+        {% endif %}
+    {% endif %}
+{% endblock %}
