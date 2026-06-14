@@ -31,7 +31,7 @@ def verify_password(username: str, password: str) -> bool:
         return False
 
 
-def create_user(username: str, password: str, role: str = "admin") -> None:
+def create_user(username: str, password: str, role: str = "admin", email: str = None) -> None:
     """Hash *password* with bcrypt and store/overwrite the user in SQLite."""
     hashed = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
-    db.add_user(username, hashed, role)
+    db.add_user(username, hashed, role, email)

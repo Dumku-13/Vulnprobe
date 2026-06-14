@@ -435,6 +435,76 @@
             white-space: pre-wrap;
         }
 
+        /* ── Expandable finding cards ─────────────────────────────────── */
+        .finding-head {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+            cursor: pointer;
+            user-select: none;
+        }
+        .finding-head .target-inline {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            color: var(--text-muted);
+            word-break: break-all;
+        }
+        .chevron {
+            margin-left: auto;
+            color: var(--text-muted);
+            font-size: 12px;
+            transition: transform .2s;
+            flex-shrink: 0;
+        }
+        .finding-card.expanded .chevron { transform: rotate(90deg); }
+
+        .finding-body {
+            display: none;
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid var(--border);
+        }
+        .finding-card.expanded .finding-body { display: block; }
+
+        .remediation-block {
+            margin-top: 8px;
+            padding: 10px 12px;
+            background: var(--green-bg);
+            border: 1px solid var(--green-bdr);
+            border-radius: 4px;
+            font-size: 11px;
+            color: var(--green);
+            line-height: 1.55;
+        }
+        .remediation-block span {
+            display: block;
+            color: var(--text-muted);
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: .5px;
+            margin-bottom: 4px;
+        }
+
+        .btn-ai {
+            margin-top: 12px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 14px;
+            border-radius: var(--radius-sm);
+            border: 1px solid rgba(124,92,252,.35);
+            background: var(--accent-soft);
+            color: var(--accent);
+            font-family: inherit;
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all .2s;
+        }
+        .btn-ai:hover { border-color: var(--accent); }
+        .btn-ai.copied { background: var(--green); color: #06060a; border-color: var(--green); }
+
         /* ── No findings ──────────────────────────────────────────────── */
         .no-findings {
             text-align: center;
@@ -475,6 +545,7 @@
                 <div class="spinner"></div>
             </button>
             <a href="/dashboard" style="font-size:12px;color:var(--text-muted);text-decoration:none;padding:8px 14px;border:1px solid var(--border);border-radius:var(--radius-sm);">📊 Dashboard</a>
+            <a href="/reports" style="font-size:12px;color:var(--text-muted);text-decoration:none;padding:8px 14px;border:1px solid var(--border);border-radius:var(--radius-sm);">📁 Reports</a>
             <a href="/logout" style="font-size:12px;color:var(--text-muted);text-decoration:none;padding:8px 14px;border:1px solid var(--border);border-radius:var(--radius-sm);">Logout</a>
         </div>
     </header>
@@ -941,6 +1012,63 @@ function severityClass(sev) {
     return 'info';
 }
 
+/* Client-side remediation text per vuln type (mirrors report_generator.py) */
+const REMEDIATION = {
+    "SQLi": "Use parameterized queries or prepared statements. Never concatenate user input into SQL strings. Apply input validation and least-privilege database accounts.",
+    "XSS": "Encode all user-supplied output using context-aware escaping. Implement Content-Security-Policy headers. Validate and sanitize all inputs.",
+    "ReflectedXSS": "Encode all user-supplied output using context-aware escaping. Implement Content-Security-Policy headers. Validate and sanitize all inputs.",
+    "LFI": "Never use user input directly in file path operations. Use a whitelist of allowed files. Disable allow_url_include in PHP. Run application with minimal filesystem permissions.",
+    "IDOR": "Implement server-side authorization checks on every object access. Use indirect references (GUIDs or hashed IDs). Never trust client-supplied IDs without verifying ownership.",
+    "Parameter Tampering": "Implement server-side authorization checks on every object access. Use indirect references (GUIDs or hashed IDs). Never trust client-supplied IDs without verifying ownership.",
+    "File Upload": "Validate file type by magic bytes, not extension. Whitelist allowed extensions. Store uploads outside webroot. Rename uploaded files. Disable script execution in upload directories.",
+    "Directory Enumeration": "Remove or restrict access to sensitive paths. Implement authentication on admin endpoints. Disable directory listing. Remove backup files from webroot. Return 404 for sensitive paths to avoid enumeration.",
+    "CSRF": "Implement CSRF tokens on all state-changing forms. Validate the Origin and Referer headers. Use SameSite=Strict cookie attribute.",
+    "Default Credentials": "Force password change on first login. Implement account lockout after 5 failed attempts. Ban known default credentials. Require strong passwords (min 12 chars, complexity rules).",
+    "Weak Session Token": "Use cryptographically secure random session token generation with at least 128 bits of entropy. Regenerate tokens on login. Set Secure and HttpOnly cookie flags.",
+    "Missing Header": "Add X-Frame-Options: DENY, X-Content-Type-Options: nosniff, Content-Security-Policy, and Strict-Transport-Security headers to all responses.",
+};
+
+function getRemediation(vulnType) {
+    if (!vulnType) return "No remediation steps available.";
+    if (REMEDIATION[vulnType]) return REMEDIATION[vulnType];
+    const low = vulnType.toLowerCase();
+    for (const k in REMEDIATION) {
+        if (low.includes(k.toLowerCase())) return REMEDIATION[k];
+    }
+    return "No remediation steps available.";
+}
+
+function buildAiPrompt(vuln, payload, evidence) {
+    return "I am doing a security audit. My web application has a " + vuln +
+        " vulnerability. The payload that triggered it was: " + payload +
+        ". The evidence returned was: " + evidence +
+        ". Please explain this vulnerability, show me the vulnerable code pattern, " +
+        "and give me the fixed secure version with explanation.";
+}
+
+async function copyText(text) {
+    try {
+        if (navigator.clipboard && window.isSecureContext) {
+            await navigator.clipboard.writeText(text);
+            return true;
+        }
+    } catch (e) { /* fall through to legacy path */ }
+    try {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        const ok = document.execCommand('copy');
+        document.body.removeChild(ta);
+        return ok;
+    } catch (e) {
+        return false;
+    }
+}
+
 function renderResults(container, data) {
     const findings = data.findings || [];
 
@@ -978,19 +1106,23 @@ function renderResults(container, data) {
         findings.forEach((f, i) => {
             const sev = f.severity || f.vuln_type || 'Info';
             const cls = severityClass(sev);
+            const vuln = f.vuln_type || f.type || sev;
             const delay = i * 50;
 
             html += `<div class="finding-card ${cls}" style="animation-delay:${delay}ms">`;
-            html += `<div class="finding-top">`;
+
+            // ── Collapsed head (always visible) ──
+            html += `<div class="finding-head">`;
             html += `<span class="badge badge-${cls}">${esc(sev)}</span>`;
-
-            if (f.vuln_type) html += `<span class="badge badge-type">${esc(f.vuln_type)}</span>`;
+            html += `<span class="badge badge-type">${esc(vuln)}</span>`;
             if (f.subtype)   html += `<span class="badge badge-type">${esc(f.subtype)}</span>`;
-            if (f.type)      html += `<span class="badge badge-type">${esc(f.type)}</span>`;
             if (f.context)   html += `<span class="badge badge-type">ctx: ${esc(f.context)}</span>`;
-
+            html += `<span class="target-inline">${esc(data.target)}</span>`;
+            html += `<span class="chevron">▶</span>`;
             html += `</div>`;
 
+            // ── Expandable body ──
+            html += `<div class="finding-body">`;
             html += `<div class="finding-detail">`;
             if (f.parameter) html += `<div><span>Parameter:</span> ${esc(f.parameter)}</div>`;
             if (f.field)     html += `<div><span>Field:</span> ${esc(f.field)}</div>`;
@@ -1003,7 +1135,13 @@ function renderResults(container, data) {
             if (f.evidence) {
                 html += `<div class="evidence-block">${esc(f.evidence)}</div>`;
             }
-            html += `</div></div>`;
+            html += `</div>`; // .finding-detail
+
+            html += `<div class="remediation-block"><span>Remediation</span>${esc(getRemediation(vuln))}</div>`;
+            html += `<button class="btn-ai" data-idx="${i}">🤖 Copy AI Prompt</button>`;
+            html += `</div>`; // .finding-body
+
+            html += `</div>`; // .finding-card
         });
 
         html += `
@@ -1020,6 +1158,32 @@ function renderResults(container, data) {
     container.classList.add('active');
     registerFindings(data.scanner, data.target, data.findings);
     container.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+    // ── Expand / collapse finding cards ──
+    container.querySelectorAll('.finding-head').forEach(head => {
+        head.addEventListener('click', () => {
+            head.closest('.finding-card').classList.toggle('expanded');
+        });
+    });
+
+    // ── Copy AI prompt per finding ──
+    container.querySelectorAll('.btn-ai').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const f = findings[btn.dataset.idx];
+            if (!f) return;
+            const vuln    = f.vuln_type || f.type || f.severity || 'Unknown';
+            const payload = f.payload || 'N/A';
+            const evidence = f.evidence || 'N/A';
+            const ok = await copyText(buildAiPrompt(vuln, payload, evidence));
+            btn.textContent = ok ? '✓ Copied!' : '✗ Copy failed';
+            btn.classList.toggle('copied', ok);
+            setTimeout(() => {
+                btn.textContent = '🤖 Copy AI Prompt';
+                btn.classList.remove('copied');
+            }, 2000);
+        });
+    });
 
     if (count > 0) {
         const btnPdf = container.querySelector('#btn-download-pdf');

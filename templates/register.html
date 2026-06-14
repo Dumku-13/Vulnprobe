@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>VulnProbe — Login</title>
+  <title>VulnProbe — Register</title>
   <style>
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -16,6 +16,7 @@
       font-family: 'Courier New', 'Fira Mono', monospace;
       color: #c9d1d9;
       overflow: hidden;
+      padding: 24px 0;
     }
 
     /* Animated grid background */
@@ -50,7 +51,6 @@
         0 20px 60px rgba(0, 0, 0, 0.5);
     }
 
-    /* Glow border animation */
     .login-container::before {
       content: '';
       position: absolute;
@@ -101,6 +101,7 @@
     }
 
     input[type="text"],
+    input[type="email"],
     input[type="password"] {
       width: 100%;
       padding: 12px 14px;
@@ -183,27 +184,35 @@
     <div class="logo">
       <div class="logo-icon">🛡️</div>
       <h1>VULNPROBE</h1>
-      <p>Security Scanner</p>
+      <p>Create Account</p>
     </div>
 
     {% if error %}
     <div class="error-msg">{{ error }}</div>
     {% endif %}
 
-    <form method="POST" action="{{ url_for('login') }}">
+    <form method="POST" action="{{ url_for('register') }}">
       <div class="form-group">
         <label for="username">Username</label>
         <input type="text" id="username" name="username" autocomplete="username" required autofocus />
       </div>
       <div class="form-group">
-        <label for="password">Password</label>
-        <input type="password" id="password" name="password" autocomplete="current-password" required />
+        <label for="email">Email</label>
+        <input type="email" id="email" name="email" autocomplete="email" required />
       </div>
-      <button type="submit" class="btn-login">Authenticate</button>
+      <div class="form-group">
+        <label for="password">Password</label>
+        <input type="password" id="password" name="password" autocomplete="new-password" minlength="8" required />
+      </div>
+      <div class="form-group">
+        <label for="confirm_password">Confirm Password</label>
+        <input type="password" id="confirm_password" name="confirm_password" autocomplete="new-password" minlength="8" required />
+      </div>
+      <button type="submit" class="btn-login">Register</button>
     </form>
 
     <div class="alt-link">
-      No account yet? <a href="{{ url_for('register') }}">Create one</a>
+      Already have an account? <a href="{{ url_for('login') }}">Sign in</a>
     </div>
 
     <div class="disclaimer">⚠ Authorized use only</div>

@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VulnProbe — React Dashboard</title>
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --bg: #0d1117;
+      --panel: #161b22;
+      --border: rgba(0, 255, 136, 0.15);
+      --accent: #00ff88;
+      --text: #c9d1d9;
+      --muted: #8b949e;
+      --dim: #6e7681;
+    }
+
+    body {
+      min-height: 100vh;
+      background: var(--bg);
+      font-family: 'Courier New', 'Fira Mono', monospace;
+      color: var(--text);
+      padding-bottom: 60px;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(0, 255, 136, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 255, 136, 0.03) 1px, transparent 1px);
+      background-size: 40px 40px;
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    .wrap { position: relative; z-index: 1; max-width: 1100px; margin: 0 auto; padding: 0 24px; }
+
+    header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 22px 0 18px; border-bottom: 1px solid var(--border); margin-bottom: 28px;
+    }
+    .brand { display: flex; align-items: center; gap: 12px; }
+    .brand .icon { font-size: 28px; }
+    .brand h1 {
+      font-size: 20px; letter-spacing: 2px; color: var(--accent);
+      text-shadow: 0 0 20px rgba(0, 255, 136, 0.3);
+    }
+    .brand p { font-size: 10px; color: var(--dim); letter-spacing: 1px; text-transform: uppercase; }
+    .nav { display: flex; align-items: center; gap: 10px; }
+    .nav a, .nav span.user {
+      font-size: 12px; text-decoration: none; color: var(--muted);
+      padding: 8px 14px; border: 1px solid var(--border); border-radius: 6px; transition: all 0.2s;
+    }
+    .nav a:hover { color: var(--accent); border-color: var(--accent); }
+    .nav .user { color: var(--accent); }
+    .nav .logout:hover { color: #f85149; border-color: #f85149; }
+
+    .section-title {
+      font-size: 12px; text-transform: uppercase; letter-spacing: 2px;
+      color: var(--muted); margin: 0 0 14px 2px;
+    }
+
+    .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 36px; }
+    .card {
+      background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+      padding: 20px; text-align: center;
+    }
+    .card .num { font-size: 32px; font-weight: 700; color: var(--accent); }
+    .card .label { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-top: 6px; }
+
+    /* Severity bar chart */
+    .chart { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 22px; margin-bottom: 36px; }
+    .bar-row { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+    .bar-row:last-child { margin-bottom: 0; }
+    .bar-label { width: 80px; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); }
+    .bar-track { flex: 1; background: rgba(255,255,255,0.04); border-radius: 6px; height: 22px; overflow: hidden; }
+    .bar-fill { height: 100%; border-radius: 6px; transition: width 0.4s ease; min-width: 2px; }
+    .bar-val { width: 36px; text-align: right; font-weight: 700; font-size: 13px; }
+    .sev-Critical { color: #f85149; } .bg-Critical { background: #f85149; }
+    .sev-High     { color: #ff7b72; } .bg-High     { background: #ff7b72; }
+    .sev-Medium   { color: #d29922; } .bg-Medium   { background: #d29922; }
+    .sev-Low      { color: #58a6ff; } .bg-Low      { background: #58a6ff; }
+    .sev-Info     { color: #8b949e; } .bg-Info     { background: #8b949e; }
+
+    .table-wrap { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    thead th {
+      text-align: left; padding: 12px 16px; font-size: 11px; text-transform: uppercase;
+      letter-spacing: 1px; color: var(--muted); border-bottom: 1px solid var(--border);
+    }
+    tbody td { padding: 12px 16px; border-bottom: 1px solid rgba(255,255,255,0.04); }
+    tbody tr:last-child td { border-bottom: none; }
+    tbody tr:hover { background: rgba(0, 255, 136, 0.03); }
+    .scanner-tag { color: var(--accent); }
+    .target-cell { color: var(--text); word-break: break-all; max-width: 280px; }
+    .count-pill {
+      display: inline-block; min-width: 26px; text-align: center; padding: 2px 8px;
+      border-radius: 10px; font-weight: 700; background: rgba(0, 255, 136, 0.1); color: var(--accent);
+    }
+    .count-zero { background: rgba(139,148,158,0.1); color: var(--muted); }
+    .time-cell { color: var(--dim); font-size: 11px; }
+    .empty, .loading { text-align: center; padding: 50px 20px; color: var(--dim); }
+  </style>
+  <script src="{{ url_for('static', filename='react.development.js') }}"></script>
+  <script src="{{ url_for('static', filename='react-dom.development.js') }}"></script>
+</head>
+<body>
+  <div id="root" class="wrap"><div class="loading">Loading dashboard…</div></div>
+
+  <script>
+    const username = {{ username | tojson }};
+    const reportUrl = (id) => "/api/report/" + id;
+    const e = React.createElement;
+    const SEV = ["Critical", "High", "Medium", "Low", "Info"];
+
+    function Header() {
+      return e("header", null,
+        e("div", { className: "brand" },
+          e("span", { className: "icon" }, "🛡️"),
+          e("div", null,
+            e("h1", null, "VULNPROBE"),
+            e("p", null, "React Dashboard"))),
+        e("nav", { className: "nav" },
+          e("span", { className: "user" }, "👤 " + username),
+          e("a", { href: "/dashboard" }, "📊 Classic"),
+          e("a", { href: "/" }, "🔍 Scanner"),
+          e("a", { className: "logout", href: "/logout" }, "⏻ Logout")));
+    }
+
+    function StatCard({ num, label }) {
+      return e("div", { className: "card" },
+        e("div", { className: "num" }, num),
+        e("div", { className: "label" }, label));
+    }
+
+    function SeverityChart({ severity }) {
+      const max = Math.max(1, ...SEV.map((s) => severity[s] || 0));
+      return e("div", { className: "chart" },
+        SEV.map((s) => {
+          const v = severity[s] || 0;
+          return e("div", { className: "bar-row", key: s },
+            e("div", { className: "bar-label sev-" + s }, s),
+            e("div", { className: "bar-track" },
+              e("div", { className: "bar-fill bg-" + s, style: { width: (v / max * 100) + "%" } })),
+            e("div", { className: "bar-val sev-" + s }, v));
+        }));
+    }
+
+    function HistoryTable({ scans }) {
+      if (!scans.length) {
+        return e("div", { className: "table-wrap" },
+          e("div", { className: "empty" }, "No scans yet. Head to the Scanner to run your first one."));
+      }
+      return e("div", { className: "table-wrap" },
+        e("table", null,
+          e("thead", null, e("tr", null,
+            e("th", null, "Scanner"), e("th", null, "Target"),
+            e("th", null, "Findings"), e("th", null, "When"), e("th", null, "Report"))),
+          e("tbody", null, scans.map((s) =>
+            e("tr", { key: s.id },
+              e("td", { className: "scanner-tag" }, s.scanner),
+              e("td", { className: "target-cell" }, s.target),
+              e("td", null, e("span", { className: "count-pill" + (s.findings_count === 0 ? " count-zero" : "") }, s.findings_count)),
+              e("td", { className: "time-cell" }, (s.created_at || "").replace("T", " ").slice(0, 19) + " UTC"),
+              e("td", null, s.findings_count > 0
+                ? e("a", { className: "scanner-tag", href: reportUrl(s.id) }, "📄 PDF")
+                : e("span", { className: "time-cell" }, "—")))))));
+    }
+
+    function App() {
+      const [data, setData] = React.useState(null);
+      const [err, setErr] = React.useState(null);
+
+      React.useEffect(() => {
+        fetch("/api/stats")
+          .then((r) => { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+          .then(setData)
+          .catch((ex) => setErr(ex.message));
+      }, []);
+
+      if (err) return e(React.Fragment, null, e(Header), e("div", { className: "empty" }, "Failed to load stats: " + err));
+      if (!data) return e(React.Fragment, null, e(Header), e("div", { className: "loading" }, "Loading dashboard…"));
+
+      const sev = data.stats.severity;
+      return e(React.Fragment, null,
+        e(Header),
+        e("h2", { className: "section-title" }, "Overview"),
+        e("div", { className: "stats" },
+          e(StatCard, { num: data.stats.total_scans, label: "Total Scans" }),
+          e(StatCard, { num: data.stats.total_findings, label: "Total Findings" }),
+          e(StatCard, { num: (sev.Critical || 0) + (sev.High || 0), label: "Critical + High" })),
+        e("h2", { className: "section-title" }, "Severity Breakdown"),
+        e(SeverityChart, { severity: sev }),
+        e("h2", { className: "section-title" }, "Recent Scan History"),
+        e(HistoryTable, { scans: data.scans }));
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(e(App));
+  </script>
+</body>
+</html>

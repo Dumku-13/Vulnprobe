@@ -12,7 +12,7 @@ import traceback
 import secrets
 from functools import wraps
 from urllib.parse import urlparse, parse_qs
-from flask import Flask, render_template, request, jsonify, session, redirect, url_for, flash
+from flask import Flask, render_template, request, jsonify, session, redirect, url_for, flash, abort
 
 # ── Ensure this directory is on the import path ──────────────────────────────
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -29,7 +29,7 @@ from dir_enum import scan_dirs
 from csrf_scanner import scan_csrf
 from auth_scanner import scan_auth
 from report_generator import generate_report
-from auth import verify_password, load_users
+from auth import verify_password, load_users, create_user
 import db
 import tempfile
 import uuid
@@ -84,10 +84,46 @@ def login():
     return render_template("login.html", error=error)
 
 
+@app.route("/register", methods=["GET", "POST"])
+def register():
+    """Self-service registration. Creates a role='user' account, then sends the
+    user to the login page. The seeded 'admin' account keeps role='admin'."""
+    error = None
+    if request.method == "POST":
+        username = request.form.get("username", "").strip()
+        email = request.form.get("email", "").strip()
+        password = request.form.get("password", "")
+        confirm = request.form.get("confirm_password", "")
+
+        if not username or not email or not password:
+            error = "All fields are required."
+        elif password != confirm:
+            error = "Passwords do not match."
+        elif len(password) < 8:
+            error = "Password must be at least 8 characters."
+        elif db.get_user(username):
+            error = "That username is already taken."
+        else:
+            create_user(username, password, role="user", email=email)
+            return redirect(url_for("login"))
+
+    return render_template("register.html", error=error)
+
+
 @app.route("/logout")
 def logout():
     session.clear()
     return redirect(url_for('login'))
+
+
+@app.route("/favicon.ico")
+def favicon():
+    """Serve a small shield SVG as the site favicon (avoids 404s in the console)."""
+    svg = (
+        "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'>"
+        "<text y='.9em' font-size='90'>🛡️</text></svg>"
+    )
+    return app.response_class(svg, mimetype="image/svg+xml")
 
 
 # ── Routes ───────────────────────────────────────────────────────────────────
@@ -108,6 +144,53 @@ def dashboard():
         stats=db.get_stats(username),
         scans=db.get_scans(username, limit=25),
     )
+
+
+@app.route("/reports")
+@login_required
+def reports():
+    """List every scan owned by the current user."""
+    username = session.get("username", "unknown")
+    return render_template(
+        "reports.html",
+        username=username,
+        scans=db.get_scans(username, limit=200),
+    )
+
+
+@app.route("/reports/<int:scan_id>")
+@login_required
+def report_detail(scan_id):
+    """Full detail page for one scan: every finding with remediation steps."""
+    from report_generator import get_vuln_meta
+
+    scan = db.get_scan(scan_id)
+    if not scan or scan["username"] != session.get("username"):
+        abort(404)
+
+    for f in scan["findings"]:
+        vt = f.get("vuln_type") or f.get("type") or ""
+        f["remediation"] = get_vuln_meta(vt).get("fix", "No remediation steps available.")
+
+    return render_template("report_detail.html", username=session.get("username"), scan=scan)
+
+
+@app.route("/react-dashboard")
+@login_required
+def react_dashboard():
+    return render_template("react_dashboard.html", username=session.get("username", "unknown"))
+
+
+@app.route("/api/stats")
+@login_required
+def api_stats():
+    """Dashboard stats + recent scan history as JSON (for the React dashboard)."""
+    username = session.get("username", "unknown")
+    return jsonify({
+        "username": username,
+        "stats": db.get_stats(username),
+        "scans": db.get_scans(username, limit=25),
+    })
 
 
 @app.route("/api/scan/sqli", methods=["POST"])
@@ -385,6 +468,25 @@ def download_scan_report(scan_id):
         download_name=f"vulnprobe_report_{scan_id}.pdf",
         mimetype="application/pdf",
     )
+
+
+@app.route("/api/report/<int:scan_id>", methods=["DELETE"])
+@login_required
+def delete_scan_report(scan_id):
+    """Delete a stored scan (and its cached PDF) owned by the current user."""
+    scan = db.get_scan(scan_id)
+    if not scan or scan["username"] != session.get("username"):
+        return jsonify({"error": "Scan not found"}), 404
+
+    pdf_path = scan.get("pdf_path")
+    if pdf_path and os.path.exists(pdf_path):
+        try:
+            os.remove(pdf_path)
+        except OSError:
+            pass
+
+    db.delete_scan(scan_id)
+    return jsonify({"status": "deleted", "scan_id": scan_id})
 
 
 @app.route("/api/report", methods=["POST"])

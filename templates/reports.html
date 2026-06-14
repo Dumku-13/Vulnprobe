@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>VulnProbe — Dashboard</title>
+  <title>VulnProbe — Reports</title>
   <style>
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -71,30 +71,6 @@
       color: var(--muted); margin: 0 0 14px 2px;
     }
 
-    /* Stats cards */
-    .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 36px; }
-    .card {
-      background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
-      padding: 20px; text-align: center;
-    }
-    .card .num { font-size: 32px; font-weight: 700; color: var(--accent); }
-    .card .label { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-top: 6px; }
-
-    /* Severity breakdown */
-    .sev-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 36px; }
-    .sev-box {
-      background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
-      padding: 14px; text-align: center;
-    }
-    .sev-box .n { font-size: 22px; font-weight: 700; }
-    .sev-box .s { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; margin-top: 4px; color: var(--muted); }
-    .sev-Critical { color: #f85149; }
-    .sev-High     { color: #ff7b72; }
-    .sev-Medium   { color: #d29922; }
-    .sev-Low      { color: #58a6ff; }
-    .sev-Info     { color: #8b949e; }
-
-    /* Scan history table */
     .table-wrap { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
     table { width: 100%; border-collapse: collapse; font-size: 13px; }
     thead th {
@@ -103,9 +79,10 @@
     }
     tbody td { padding: 12px 16px; border-bottom: 1px solid rgba(255,255,255,0.04); }
     tbody tr:last-child td { border-bottom: none; }
-    tbody tr:hover { background: rgba(0, 255, 136, 0.03); }
+    tbody tr { cursor: pointer; transition: background 0.15s; }
+    tbody tr:hover { background: rgba(0, 255, 136, 0.05); }
     .scanner-tag { color: var(--accent); }
-    .target-cell { color: var(--text); word-break: break-all; max-width: 280px; }
+    .target-cell { color: var(--text); word-break: break-all; max-width: 260px; }
     .count-pill {
       display: inline-block; min-width: 26px; text-align: center;
       padding: 2px 8px; border-radius: 10px; font-weight: 700;
@@ -113,12 +90,18 @@
     }
     .count-zero { background: rgba(139,148,158,0.1); color: var(--muted); }
     .time-cell { color: var(--dim); font-size: 11px; }
-    .dl {
-      font-size: 11px; text-decoration: none; color: var(--accent);
-      border: 1px solid var(--border); padding: 5px 10px; border-radius: 5px;
+
+    .sev-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+    .sev-chip {
+      font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 4px;
+      border: 1px solid currentColor;
     }
-    .dl:hover { border-color: var(--accent); }
-    .dl-none { color: var(--dim); font-size: 11px; }
+    .sev-Critical { color: #f85149; }
+    .sev-High     { color: #ff7b72; }
+    .sev-Medium   { color: #d29922; }
+    .sev-Low      { color: #58a6ff; }
+    .sev-Info     { color: #8b949e; }
+    .sev-none { color: var(--dim); font-size: 11px; }
 
     .empty { text-align: center; padding: 50px 20px; color: var(--dim); }
     .empty a { color: var(--accent); text-decoration: none; }
@@ -132,49 +115,18 @@
         <span class="icon">🛡️</span>
         <div>
           <h1>VULNPROBE</h1>
-          <p>Operator Dashboard</p>
+          <p>Reports</p>
         </div>
       </div>
       <nav class="nav">
         <span class="user">👤 {{ username }}</span>
+        <a href="{{ url_for('dashboard') }}">📊 Dashboard</a>
         <a href="{{ url_for('index') }}">🔍 Scanner</a>
-        <a href="{{ url_for('reports') }}">📁 Reports</a>
-        <a href="{{ url_for('react_dashboard') }}">⚛️ React Dashboard</a>
         <a class="logout" href="{{ url_for('logout') }}">⏻ Logout</a>
       </nav>
     </header>
 
-    <h2 class="section-title">Overview</h2>
-    <div class="stats">
-      <div class="card">
-        <div class="num">{{ stats.total_scans }}</div>
-        <div class="label">Total Scans</div>
-      </div>
-      <div class="card">
-        <div class="num">{{ stats.total_findings }}</div>
-        <div class="label">Total Findings</div>
-      </div>
-      <div class="card">
-        <div class="num">{{ stats.severity.Critical + stats.severity.High }}</div>
-        <div class="label">Critical + High</div>
-      </div>
-      <div class="card">
-        <div class="num">{{ scans|length }}</div>
-        <div class="label">Recent Runs</div>
-      </div>
-    </div>
-
-    <h2 class="section-title">Severity Breakdown</h2>
-    <div class="sev-grid">
-      {% for sev in ['Critical', 'High', 'Medium', 'Low', 'Info'] %}
-      <div class="sev-box">
-        <div class="n sev-{{ sev }}">{{ stats.severity[sev] }}</div>
-        <div class="s">{{ sev }}</div>
-      </div>
-      {% endfor %}
-    </div>
-
-    <h2 class="section-title">Recent Scan History</h2>
+    <h2 class="section-title">All Reports</h2>
     <div class="table-wrap">
       {% if scans %}
       <table>
@@ -183,35 +135,40 @@
             <th>Scanner</th>
             <th>Target</th>
             <th>Findings</th>
+            <th>Severity</th>
             <th>When</th>
-            <th>Report</th>
           </tr>
         </thead>
         <tbody>
           {% for scan in scans %}
-          <tr>
+          <tr onclick="window.location='{{ url_for('report_detail', scan_id=scan.id) }}'">
             <td class="scanner-tag">{{ scan.scanner }}</td>
             <td class="target-cell">{{ scan.target }}</td>
             <td>
-              <span class="count-pill {{ 'count-zero' if scan.findings_count == 0 }}">
-                {{ scan.findings_count }}
-              </span>
+              <span class="count-pill {{ 'count-zero' if scan.findings_count == 0 }}">{{ scan.findings_count }}</span>
             </td>
-            <td class="time-cell">{{ scan.created_at.replace('T', ' ')[:19] }} UTC</td>
             <td>
-              {% if scan.findings_count > 0 %}
-              <a class="dl" href="{{ url_for('download_scan_report', scan_id=scan.id) }}">📄 PDF</a>
+              {% set has_sev = scan.severity_summary.values()|select|list|length > 0 %}
+              {% if has_sev %}
+              <div class="sev-chips">
+                {% for sev in ['Critical', 'High', 'Medium', 'Low', 'Info'] %}
+                  {% if scan.severity_summary.get(sev, 0) > 0 %}
+                  <span class="sev-chip sev-{{ sev }}">{{ sev[0] }} {{ scan.severity_summary[sev] }}</span>
+                  {% endif %}
+                {% endfor %}
+              </div>
               {% else %}
-              <span class="dl-none">—</span>
+              <span class="sev-none">—</span>
               {% endif %}
             </td>
+            <td class="time-cell">{{ scan.created_at.replace('T', ' ')[:19] }} UTC</td>
           </tr>
           {% endfor %}
         </tbody>
       </table>
       {% else %}
       <div class="empty">
-        No scans yet. Head to the <a href="{{ url_for('index') }}">Scanner</a> to run your first one.
+        No reports yet. Head to the <a href="{{ url_for('index') }}">Scanner</a> to run your first scan.
       </div>
       {% endif %}
     </div>

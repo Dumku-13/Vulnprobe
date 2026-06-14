@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VulnProbe — Report #{{ scan.id }}</title>
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --bg: #0d1117;
+      --panel: #161b22;
+      --panel-hi: #1c232c;
+      --border: rgba(0, 255, 136, 0.15);
+      --accent: #00ff88;
+      --text: #c9d1d9;
+      --muted: #8b949e;
+      --dim: #6e7681;
+    }
+
+    body {
+      min-height: 100vh;
+      background: var(--bg);
+      font-family: 'Courier New', 'Fira Mono', monospace;
+      color: var(--text);
+      padding-bottom: 60px;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(0, 255, 136, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 255, 136, 0.03) 1px, transparent 1px);
+      background-size: 40px 40px;
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    .wrap { position: relative; z-index: 1; max-width: 1000px; margin: 0 auto; padding: 0 24px; }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 22px 0 18px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 24px;
+    }
+    .brand { display: flex; align-items: center; gap: 12px; }
+    .brand .icon { font-size: 28px; }
+    .brand h1 { font-size: 20px; letter-spacing: 2px; color: var(--accent); text-shadow: 0 0 20px rgba(0, 255, 136, 0.3); }
+    .brand p { font-size: 10px; color: var(--dim); letter-spacing: 1px; text-transform: uppercase; }
+
+    .nav { display: flex; align-items: center; gap: 10px; }
+    .nav a, .nav span.user {
+      font-size: 12px; text-decoration: none; color: var(--muted);
+      padding: 8px 14px; border: 1px solid var(--border); border-radius: 6px; transition: all 0.2s;
+    }
+    .nav a:hover { color: var(--accent); border-color: var(--accent); }
+    .nav .user { color: var(--accent); }
+    .nav .logout:hover { color: #f85149; border-color: #f85149; }
+
+    /* Meta bar */
+    .meta-bar {
+      background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+      padding: 18px 22px; margin-bottom: 22px;
+      display: flex; flex-wrap: wrap; gap: 26px; align-items: center;
+    }
+    .meta-item { display: flex; flex-direction: column; gap: 3px; }
+    .meta-item .k { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); }
+    .meta-item .v { font-size: 15px; color: var(--text); word-break: break-all; }
+    .meta-item .v.accent { color: var(--accent); }
+
+    .actions { margin-left: auto; display: flex; gap: 10px; }
+    .btn {
+      font-size: 12px; font-family: inherit; cursor: pointer; text-decoration: none;
+      padding: 9px 16px; border-radius: 6px; border: 1px solid var(--border);
+      background: transparent; color: var(--text); transition: all 0.2s;
+    }
+    .btn-pdf { color: var(--accent); border-color: var(--border); }
+    .btn-pdf:hover { border-color: var(--accent); box-shadow: 0 0 14px rgba(0,255,136,0.12); }
+    .btn-del { color: #f85149; border-color: rgba(248,81,73,0.3); }
+    .btn-del:hover { border-color: #f85149; background: rgba(248,81,73,0.08); }
+
+    .section-title { font-size: 12px; text-transform: uppercase; letter-spacing: 2px; color: var(--muted); margin: 0 0 14px 2px; }
+
+    /* Finding cards */
+    .finding {
+      background: var(--panel); border: 1px solid var(--border);
+      border-left: 4px solid var(--dim); border-radius: 8px;
+      padding: 18px 20px; margin-bottom: 14px;
+    }
+    .finding.sev-Critical { border-left-color: #f85149; }
+    .finding.sev-High     { border-left-color: #ff7b72; }
+    .finding.sev-Medium   { border-left-color: #d29922; }
+    .finding.sev-Low      { border-left-color: #58a6ff; }
+    .finding.sev-Info     { border-left-color: #8b949e; }
+
+    .finding-top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+    .badge {
+      font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;
+      padding: 3px 10px; border-radius: 4px; border: 1px solid currentColor;
+    }
+    .badge.sev-Critical { color: #f85149; }
+    .badge.sev-High     { color: #ff7b72; }
+    .badge.sev-Medium   { color: #d29922; }
+    .badge.sev-Low      { color: #58a6ff; }
+    .badge.sev-Info     { color: #8b949e; }
+    .badge-type { color: var(--accent); }
+    .vuln-name { font-size: 15px; font-weight: 700; color: var(--text); }
+
+    .row { margin-bottom: 12px; }
+    .row .k {
+      font-size: 10px; text-transform: uppercase; letter-spacing: 1px;
+      color: var(--muted); margin-bottom: 4px;
+    }
+    .row .v { font-size: 13px; color: var(--text); word-break: break-all; }
+    .code-block {
+      background: var(--bg); border: 1px solid var(--border); border-radius: 5px;
+      padding: 10px 12px; font-size: 12px; color: var(--text);
+      white-space: pre-wrap; word-break: break-all; max-height: 200px; overflow: auto;
+    }
+    .remediation .v { color: #9be9c0; line-height: 1.6; }
+
+    .ai-btn {
+      margin-top: 6px; font-size: 11px; font-family: inherit; cursor: pointer;
+      padding: 8px 14px; border-radius: 6px; border: 1px solid var(--border);
+      background: rgba(0,255,136,0.06); color: var(--accent); transition: all 0.2s;
+    }
+    .ai-btn:hover { border-color: var(--accent); }
+    .ai-btn.copied { background: var(--accent); color: #0d1117; border-color: var(--accent); }
+
+    .empty { text-align: center; padding: 50px 20px; color: var(--dim); }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+
+    <header>
+      <div class="brand">
+        <span class="icon">🛡️</span>
+        <div>
+          <h1>VULNPROBE</h1>
+          <p>Report Detail</p>
+        </div>
+      </div>
+      <nav class="nav">
+        <span class="user">👤 {{ username }}</span>
+        <a href="{{ url_for('reports') }}">📁 Reports</a>
+        <a href="{{ url_for('dashboard') }}">📊 Dashboard</a>
+        <a class="logout" href="{{ url_for('logout') }}">⏻ Logout</a>
+      </nav>
+    </header>
+
+    <div class="meta-bar">
+      <div class="meta-item">
+        <span class="k">Scanner</span>
+        <span class="v accent">{{ scan.scanner }}</span>
+      </div>
+      <div class="meta-item">
+        <span class="k">Target</span>
+        <span class="v">{{ scan.target }}</span>
+      </div>
+      <div class="meta-item">
+        <span class="k">Findings</span>
+        <span class="v">{{ scan.findings_count }}</span>
+      </div>
+      <div class="meta-item">
+        <span class="k">When</span>
+        <span class="v">{{ scan.created_at.replace('T', ' ')[:19] }} UTC</span>
+      </div>
+      <div class="actions">
+        {% if scan.findings_count > 0 %}
+        <a class="btn btn-pdf" href="{{ url_for('download_scan_report', scan_id=scan.id) }}">📄 Download PDF</a>
+        {% endif %}
+        <button class="btn btn-del" id="btn-delete">🗑 Delete</button>
+      </div>
+    </div>
+
+    <h2 class="section-title">Findings</h2>
+
+    {% if scan.findings %}
+      {% for f in scan.findings %}
+      {% set sev = (f.severity or 'Info')|title %}
+      {% set vuln = f.vuln_type or f.type or 'Unknown' %}
+      <div class="finding sev-{{ sev }}">
+        <div class="finding-top">
+          <span class="badge sev-{{ sev }}">{{ sev }}</span>
+          <span class="badge badge-type">{{ vuln }}</span>
+          {% if f.subtype %}<span class="badge badge-type">{{ f.subtype }}</span>{% endif %}
+          <span class="vuln-name">{{ vuln }}</span>
+        </div>
+
+        {% if f.parameter %}
+        <div class="row"><div class="k">Parameter</div><div class="v">{{ f.parameter }}</div></div>
+        {% endif %}
+        {% if f.field %}
+        <div class="row"><div class="k">Field</div><div class="v">{{ f.field }}</div></div>
+        {% endif %}
+        {% if f.port %}
+        <div class="row"><div class="k">Port</div><div class="v">{{ f.port }}{% if f.banner %} — {{ f.banner }}{% endif %}</div></div>
+        {% endif %}
+        {% if f.url %}
+        <div class="row"><div class="k">URL</div><div class="v">{{ f.url }}</div></div>
+        {% endif %}
+
+        <div class="row">
+          <div class="k">Payload</div>
+          <div class="code-block">{{ f.payload if f.payload else '—' }}</div>
+        </div>
+
+        <div class="row">
+          <div class="k">Evidence</div>
+          <div class="code-block">{{ f.evidence if f.evidence else '—' }}</div>
+        </div>
+
+        <div class="row remediation">
+          <div class="k">Remediation</div>
+          <div class="v">{{ f.remediation }}</div>
+        </div>
+
+        <button class="ai-btn"
+                data-vuln="{{ vuln }}"
+                data-payload="{{ f.payload if f.payload else 'N/A' }}"
+                data-evidence="{{ f.evidence if f.evidence else 'N/A' }}">
+          🤖 Copy AI Prompt
+        </button>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="empty">No findings recorded for this scan.</div>
+    {% endif %}
+
+  </div>
+
+  <script>
+    /* ── AI prompt copy ──────────────────────────────────────────── */
+    function buildPrompt(vuln, payload, evidence) {
+      return "I am doing a security audit. My web application has a " + vuln +
+        " vulnerability. The payload that triggered it was: " + payload +
+        ". The evidence returned was: " + evidence +
+        ". Please explain this vulnerability, show me the vulnerable code pattern, " +
+        "and give me the fixed secure version with explanation.";
+    }
+
+    async function copyText(text) {
+      try {
+        if (navigator.clipboard && window.isSecureContext) {
+          await navigator.clipboard.writeText(text);
+          return true;
+        }
+      } catch (e) { /* fall through to legacy path */ }
+      try {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        const ok = document.execCommand('copy');
+        document.body.removeChild(ta);
+        return ok;
+      } catch (e) {
+        return false;
+      }
+    }
+
+    document.querySelectorAll('.ai-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const prompt = buildPrompt(btn.dataset.vuln, btn.dataset.payload, btn.dataset.evidence);
+        const ok = await copyText(prompt);
+        const original = '🤖 Copy AI Prompt';
+        btn.textContent = ok ? '✓ Copied!' : '✗ Copy failed';
+        btn.classList.toggle('copied', ok);
+        setTimeout(() => {
+          btn.textContent = original;
+          btn.classList.remove('copied');
+        }, 2000);
+      });
+    });
+
+    /* ── Delete report ───────────────────────────────────────────── */
+    const delBtn = document.getElementById('btn-delete');
+    if (delBtn) {
+      delBtn.addEventListener('click', async () => {
+        if (!confirm('Delete this report permanently?')) return;
+        delBtn.disabled = true;
+        try {
+          const res = await fetch('{{ url_for("delete_scan_report", scan_id=scan.id) }}', {
+            method: 'DELETE',
+            credentials: 'include',
+          });
+          if (!res.ok) throw new Error('Delete failed');
+          window.location = '{{ url_for("reports") }}';
+        } catch (e) {
+          alert('Error: ' + e.message);
+          delBtn.disabled = false;
+        }
+      });
+    }
+  </script>
+</body>
+</html>

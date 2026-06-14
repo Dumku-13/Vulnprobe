@@ -43,12 +43,14 @@ def init_db() -> None:
             CREATE TABLE IF NOT EXISTS users (
                 id            INTEGER PRIMARY KEY AUTOINCREMENT,
                 username      TEXT    UNIQUE NOT NULL,
+                email         TEXT,
                 password_hash TEXT    NOT NULL,
                 role          TEXT    NOT NULL DEFAULT 'admin',
                 created_at    TEXT    NOT NULL
             )
             """
         )
+        _ensure_user_columns(conn)
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS scans (
@@ -70,6 +72,15 @@ def init_db() -> None:
         )
 
     _migrate_users_json()
+
+
+def _ensure_user_columns(conn) -> None:
+    """Add columns introduced after the initial schema to pre-existing DBs."""
+    existing = {r["name"] for r in conn.execute("PRAGMA table_info(users)").fetchall()}
+    if "email" not in existing:
+        conn.execute("ALTER TABLE users ADD COLUMN email TEXT")
+    if "role" not in existing:
+        conn.execute("ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'admin'")
 
 
 def _migrate_users_json() -> None:
@@ -108,15 +119,16 @@ def get_user(username: str):
         ).fetchone()
 
 
-def add_user(username: str, password_hash: str, role: str = "admin") -> None:
+def add_user(username: str, password_hash: str, role: str = "admin", email: str = None) -> None:
     """Insert or replace a user record."""
     with get_conn() as conn:
         conn.execute(
-            "INSERT INTO users (username, password_hash, role, created_at) "
-            "VALUES (?, ?, ?, ?) "
+            "INSERT INTO users (username, email, password_hash, role, created_at) "
+            "VALUES (?, ?, ?, ?, ?) "
             "ON CONFLICT(username) DO UPDATE SET "
-            "password_hash = excluded.password_hash, role = excluded.role",
-            (username, password_hash, role, _now()),
+            "email = excluded.email, password_hash = excluded.password_hash, "
+            "role = excluded.role",
+            (username, email, password_hash, role, _now()),
         )
 
 
@@ -172,6 +184,12 @@ def set_scan_pdf(scan_id: int, pdf_path: str) -> None:
         conn.execute(
             "UPDATE scans SET pdf_path = ? WHERE id = ?", (pdf_path, scan_id)
         )
+
+
+def delete_scan(scan_id: int) -> None:
+    """Permanently remove a scan row."""
+    with get_conn() as conn:
+        conn.execute("DELETE FROM scans WHERE id = ?", (scan_id,))
 
 
 def get_scan(scan_id: int):

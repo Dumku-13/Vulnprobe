@@ -112,6 +112,23 @@ HARDCODED_VULN_DATA = {
     }
 }
 
+def get_vuln_meta(vuln_type: str) -> dict:
+    """Resolve a vuln_type to its hardcoded metadata (explanation/impact/fix/...).
+
+    Exact match first, then case-insensitive substring fallback — mirrors the
+    lookup used when rendering the PDF. Returns {} if nothing matches.
+    """
+    vt = vuln_type or ""
+    meta = HARDCODED_VULN_DATA.get(vt)
+    if meta is None:
+        vt_lower = vt.lower()
+        for known_key in HARDCODED_VULN_DATA:
+            if known_key.lower() in vt_lower:
+                meta = HARDCODED_VULN_DATA[known_key]
+                break
+    return meta or {}
+
+
 # ---------------------------------------------------------------------------
 # Custom Flowables
 # ---------------------------------------------------------------------------
