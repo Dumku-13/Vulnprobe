@@ -1,5 +1,10 @@
 # VulnProbe
 
+![Python](https://img.shields.io/badge/Python-3.10+-3776AB?logo=python&logoColor=white)
+![Flask](https://img.shields.io/badge/Flask-UI-000000?logo=flask)
+![Scanners](https://img.shields.io/badge/scanner%20modules-9-b91c1c)
+![Reports](https://img.shields.io/badge/reports-PDF%20%C2%B7%20GDPR%20%C2%B7%20SOC%202-1f6feb)
+
 A modular black-box web vulnerability scanner with a session-authenticated
 dashboard, per-user scan history, and automated PDF reporting. Built in Python
 with Flask + SQLite.
@@ -71,8 +76,8 @@ python seed_user.py
 python app.py
 ```
 
-The app starts on **http://127.0.0.1:5001**. Default seeded login is
-`admin` / `vulnprobe2025` — change it in `seed_user.py` before any real use.
+The app starts on **http://127.0.0.1:5001**. `seed_user.py` prompts for the
+admin password (or reads `VULNPROBE_ADMIN_PASSWORD`); no default credentials ship with the repo.
 
 On first run, `db.py` creates `vulnprobe.db` and (if present) migrates an
 existing `users.json` into the `users` table.
@@ -93,3 +98,10 @@ existing `users.json` into the `users` table.
 ## Tech
 
 Python · Flask · SQLite · bcrypt · ReportLab · requests
+
+---
+
+## Practice target
+
+`targets/target_app_01/` is a deliberately vulnerable Flask app (SQL injection, weak
+session handling) used as a safe local target for the scanners. **Never deploy it.**
